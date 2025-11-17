@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export default function Blackjack({ api, username, balance, onResult }) {
   const [bet, setBet] = useState(10)
@@ -139,24 +140,83 @@ export default function Blackjack({ api, username, balance, onResult }) {
         )}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-sm">
         <div>
-          <div className="text-neutral-400 mb-1">Your Hand</div>
-          <div className="font-mono text-lg">{playerCards.join(' ') || '—'}</div>
-          <div className="text-neutral-400 mt-1">Total: {playerCards.length ? handTotal(playerCards) : '-'}</div>
+          <div className="text-neutral-400 mb-2">Your Hand</div>
+          <CardRow cards={playerCards} revealAll onRevealKey={`${playerCards.join('-')}-${status}`} />
+          <div className="text-neutral-400 mt-2">Total: {playerCards.length ? handTotal(playerCards) : '-'}</div>
         </div>
         <div>
-          <div className="text-neutral-400 mb-1">Dealer</div>
-          <div className="font-mono text-lg">{showDealer ? (dealerCards.join(' ') || '—') : (dealerCards[0] ? `${dealerCards[0]} ??` : '—')}</div>
-          <div className="text-neutral-400 mt-1">Total: {showDealer ? (dealerCards.length ? handTotal(dealerCards) : '-') : '??'}</div>
+          <div className="text-neutral-400 mb-2">Dealer</div>
+          <CardRow cards={dealerCards} revealAll={showDealer} hideHole={!showDealer} onRevealKey={`${dealerCards.join('-')}-${status}`} />
+          <div className="text-neutral-400 mt-2">Total: {showDealer ? (dealerCards.length ? handTotal(dealerCards) : '-') : '??'}</div>
         </div>
       </div>
 
       {message && (
-        <div className="mt-4 text-sm font-medium">{message}</div>
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="mt-4 text-sm font-medium">
+          {message}
+        </motion.div>
       )}
     </div>
   )
+}
+
+function CardRow({ cards, revealAll, hideHole, onRevealKey }){
+  return (
+    <div className="flex gap-3 min-h-[86px]">
+      <AnimatePresence initial={false}>
+        {cards.map((c, idx) => (
+          <motion.div
+            key={`${c}-${idx}-${onRevealKey}`}
+            initial={{ y: -30, opacity: 0, rotate: -2 }}
+            animate={{ y: 0, opacity: 1, rotate: 0 }}
+            exit={{ y: -20, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 300, damping: 22, delay: idx * 0.06 }}
+          >
+            <PlayingCard card={c} hidden={hideHole && idx === 1} reveal={revealAll} />
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function PlayingCard({ card, hidden, reveal }){
+  if (hidden && !reveal) {
+    return (
+      <motion.div
+        className="w-14 h-20 rounded-lg bg-gradient-to-br from-neutral-700 to-neutral-800 border border-neutral-600 shadow-inner flex items-center justify-center"
+        initial={{ rotateY: 0 }}
+        animate={{ rotateY: 0 }}
+        style={{ transformStyle: 'preserve-3d' }}
+      >
+        <div className="text-neutral-300 text-xs tracking-wider">Hidden</div>
+      </motion.div>
+    )
+  }
+  const { rank, suit, red } = parseCard(card)
+  return (
+    <motion.div
+      className="w-14 h-20 rounded-lg bg-neutral-100/95 text-neutral-900 border border-neutral-300 shadow-md relative overflow-hidden"
+      whileHover={{ y: -2 }}
+    >
+      <div className={`absolute inset-0 ${red ? 'text-red-600' : 'text-neutral-900'}`}>
+        <div className="p-1 text-xs font-semibold">{rank}</div>
+        <div className="absolute bottom-1 right-1 text-lg">{suit}</div>
+      </div>
+      <div className="absolute inset-0 pointer-events-none opacity-10 bg-[radial-gradient(circle_at_30%_30%,white,transparent_60%)]" />
+    </motion.div>
+  )
+}
+
+function parseCard(c){
+  const rank = c.slice(0, -1)
+  const s = c.slice(-1)
+  const suitMap = { '♠': '♠', '♣': '♣', '♥': '♥', '♦': '♦', 'S':'♠', 'C':'♣', 'H':'♥', 'D':'♦' }
+  const suit = suitMap[s] || s
+  const red = suit === '♥' || suit === '♦'
+  return { rank, suit, red }
 }
 
 function handTotal(cards){
